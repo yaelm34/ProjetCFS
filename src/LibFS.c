@@ -76,18 +76,12 @@ int create_root_inode(){
 	inode.size=0;
 	inode.pointers[0]=0;
 
-
-
-	inode_bloc_table[0]=inode;
-
 	data_bloc data;
 	memset(&data,-1,sizeof(data));
 
-	data_bloc_table[0]=data;
 
-
-	Disk_Write(5,(char*)&(inode_bloc_table));
-	Disk_Write(2053,(char*)&(data_bloc_table));
+	Disk_Write(5,(char*)&(inode));
+	Disk_Write(2053,(char*)&(data));
 
 	return 0;
 	
@@ -149,7 +143,7 @@ int inodeWrite(inode_bloc inode, int inode_no){ //écrit un bloc d'inode dans la
 	int indice=inode_no % 4; //Indice interne
 	inode sect_in[4]; //bloc de 4 inodes
 
-	if(Disk_Read(5+sec,(char*)sect_in)==-1){  //récupération des inodes du secteur
+	if(Disk_Read(5+sec,(char*)&(sect_in))==-1){  //récupération des inodes du secteur
 
 		printf("Erreur: impossible d'enregistre le nouvel inode\n");
 		osErrno=E_CREATE;
@@ -160,7 +154,7 @@ int inodeWrite(inode_bloc inode, int inode_no){ //écrit un bloc d'inode dans la
 	sect_in[indice]=inode; //ajout du nouvel inode
 
 
-	if(Disk_Write(5+sec,(char*)sect_in)==-1){
+	if(Disk_Write(5+sec,(char*)&(sect_in))==-1){
 
 		printf("Erreur: impossible d'enregistre le nouvel inode\n");
 		osErrno=E_CREATE;
@@ -173,18 +167,14 @@ int inodeWrite(inode_bloc inode, int inode_no){ //écrit un bloc d'inode dans la
 	}
 
 
-}
+
 
 
 int FS_Boot(char *path){
 
     printf("FS_Boot %s\n", path);
 
-    memset(&open_file_table,0,sizeof(open_file_table));
-    memset(&inode_bloc_table,0,sizeof(inode_bloc_table));
-    memset(&data_bloc_table,0,sizeof(data_bloc_table));
-    
-    
+    memset(&open_file_table,0,sizeof(open_file_table)); //initialisation de la table des fichiers ouvert
 
     if (Disk_Init() == -1) {
 	printf("Disk_Init() failed\n");
@@ -330,37 +320,7 @@ int Dir_Create(char *path)
 {
     printf("Dir_Create %s\n", path); 
 
-    //création du nouvel inode
-
-    inode_bloc inode;  
-	memset(&inode,-1,sizeof(inode));
-	inode.type=0;
-	inode.size=0;
-
-
-	int inode_no = findfree(Imap); //quel num d'inode dispo ?
-
-	if (inode_no==-1){
-
-		osErrno= E_CREATE;
-		printf("Erreur: Impossible de créer le dossier: Out of range\n");
-		return -1;
-
-	}
-
-    if(inodeWrite(inode,inode_no)==-1){  //écrire l'inode au bon emplacement
-
-    	osErrno=E_CREATE;
-  		printf("Erreur:Impossible de créer le dossier: Write inode error\n");
-  		return -1;
-
-    } 
-
-	Imap[inode_no]=0x01; //définir l'inode comme étant occupé
-
-
-
-   	//création d'un data bloc
+     //création d'un data bloc
 
    	int bloc_no = findfree(Dmap); //quel num de bloc dispo ?
 
@@ -385,9 +345,67 @@ int Dir_Create(char *path)
    	}
 
 	data_bloc bloc;
-	strcpy(bloc.data,name); //copier le nom du dossier dans le bloc de données
+	memset(&bloc.data,0,sizeof(data_bloc.data));
+	Disk_Write(2053+bloc_no,(char*&bloc)); //écriture du nouveau bloc
+
 
 	Dmap[bloc_no]=0x01; //définir le bloc comme étant occupé 
+
+
+    //création du nouvel inode
+
+    inode_bloc inode;  
+	memset(&inode,-1,sizeof(inode));
+	inode.type=0;
+	inode.size=0;
+	inode.pointers[0]=bloc_no;
+
+	int inode_no = findfree(Imap); //quel num d'inode dispo ?
+
+	if (inode_no==-1){
+
+		osErrno= E_CREATE;
+		printf("Erreur: Impossible de créer le dossier: Out of range\n");
+		return -1;
+
+	}
+
+    if(inodeWrite(inode,inode_no)==-1){  //écrire l'inode au bon emplacement
+
+    	osErrno=E_CREATE;
+  		printf("Erreur:Impossible de créer le dossier: Write inode error\n");
+  		return -1;
+
+    } 
+
+	Imap[inode_no]=0x01; //définir l'inode comme étant occupé
+
+	paire ma_paire;
+
+	ma_paire.filename=name;
+	ma_paire.inode=inode_no;
+
+	//Chercher l'inode su répertoire parent
+
+	char parent_name=str[len-2];
+	int inode_parent_index=nameToInode(parent_name);
+
+	inode inode_parent=readinode(inode_parent_index);
+
+	int bloc_parent_index=inode_parent.pointers[0];
+
+	//placer ma_paire dans le répertoire parent
+
+	byte data[512];
+
+	Disk_Read(2053+bloc_parent_index,(char*)&data);
+
+	char *new_data=strcat((char*)&data,(char*)&ma_paire);
+
+	Disk_Write(2053+bloc_parent_index,new_data);	
+
+
+
 
 	if(savemaps()==-1 || FS_Sync()==-1){ //sauvegarde des bitmaps mises à jour
 
