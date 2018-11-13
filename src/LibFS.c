@@ -79,7 +79,8 @@ int create_root_inode(){
 	data_bloc data;
 	memset(&data,-1,sizeof(data));
 
-
+	Dmap[0]=0X01;
+	savemaps();
 	Disk_Write(5,(char*)&(inode));
 	Disk_Write(2053,(char*)&(data));
 
