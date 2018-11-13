@@ -36,14 +36,11 @@ typedef struct databloc_bitmap{
 }databloc_bitmap;
 
 
-typedef struct inode_bloc{ //structure pour créer un inodebloc 
-
-	int type; //0 dir 1 file
-	int size;
-	int pointers[30];
-
-
-}inode_bloc;
+typedef struct t_inode_bloc { 
+    int tf;  //type fichier, 0 data, 1 repertoire
+    int sz;  // taille en octets
+    int adr[30];  // adresses des blocs
+    } inode_bloc;
 
 typedef struct data_bloc{ //structure pour créer un databloc 
 
@@ -52,8 +49,9 @@ typedef struct data_bloc{ //structure pour créer un databloc
 }data_bloc;
 
 
-typedef struct paire{
+typedef struct paire{ //32 octets
 
+	char padding[12];
 	char filename[16];
 	int inode;
 
@@ -63,6 +61,50 @@ static inode_bloc open_file_table[256]; //table des fichiers ouverts
 
 int nameToInode(char* path){ //renvoie le numero d'inode depuis le nom du fichier
 
+	int inode_no;
+	int l= strlen(path);
+
+	for(int c=0; c<l-1 ;c++){
+
+		for(int i=0; i<8192; i++){
+
+			inode_no=i; 
+			indice_bloc=readinode(inode_no).adr[0];
+			int type=readinode(inode_no).tf;
+
+			if(type==1){ //si c'est un dossier
+
+				paire sect_paire[16];
+				Disk_Read(2053+indice_bloc,(char*)sect_paire);
+
+				for(int j=0; j<16; j++){
+
+					if(sect_paire[j].filename=path[c]){
+
+						if (c==l-1){
+
+							
+						}
+
+
+					}else{
+
+						return -1;
+					}
+				}
+			}
+
+
+
+
+
+
+
+
+
+		}
+	}
+
 	return 0;
 
 }
@@ -70,11 +112,11 @@ int nameToInode(char* path){ //renvoie le numero d'inode depuis le nom du fichie
 
 int create_root_inode(){
 	
-	inode_bloc inode;
+	inode inode;
 	memset(&inode,-1,sizeof(inode));
-	inode.type=0;   //0=dossier 1=fichier
-	inode.size=0;
-	inode.pointers[0]=0;
+	inode.tf=0;   //0=dossier 1=fichier
+	inode.sz=0;
+	inode.adr[0]=0;
 
 	data_bloc data;
 	memset(&data,-1,sizeof(data));
@@ -140,15 +182,15 @@ int checkDisk(){ //Vérifier que le disque appartient bien au FS
 
 int inodeWrite(inode_bloc inode, int inode_no){ //écrit un bloc d'inode dans la table des inodes
 
-	int sec=inode_no/4;  //indice du bloc
-	int indice=inode_no % 4; //Indice interne
-	inode sect_in[4]; //bloc de 4 inodes
+	int sec=inode_no/4; //indice du bloc
+	int indice= inode_no % 4;//Indice interne
+	inode_bloc sect_in[4]; //bloc de 4 inodes
 
 	if(Disk_Read(5+sec,(char*)&(sect_in))==-1){  //récupération des inodes du secteur
 
 		printf("Erreur: impossible d'enregistre le nouvel inode\n");
 		osErrno=E_CREATE;
-		return -1
+		return -1;
 	}
 
 
@@ -159,7 +201,7 @@ int inodeWrite(inode_bloc inode, int inode_no){ //écrit un bloc d'inode dans la
 
 		printf("Erreur: impossible d'enregistre le nouvel inode\n");
 		osErrno=E_CREATE;
-		return -1
+		return -1;
 	}
 
 	return 0;
@@ -335,7 +377,7 @@ int Dir_Create(char *path)
 
    	char *str=strtok(path,"/"); //récup. du nom
     int len= strlen(str); //récup. du nom
-   	char name=str[len-1]; //récup. du nom
+   	char *name=str[len-1]; //récup. du nom
  
    	if(strlen(name)>16){
 
@@ -346,8 +388,8 @@ int Dir_Create(char *path)
    	}
 
 	data_bloc bloc;
-	memset(&bloc.data,0,sizeof(data_bloc.data));
-	Disk_Write(2053+bloc_no,(char*&bloc)); //écriture du nouveau bloc
+	memset(&bloc,0,sizeof(data_bloc));
+	Disk_Write(2053+bloc_no,(char*)&bloc); //écriture du nouveau bloc
 
 
 	Dmap[bloc_no]=0x01; //définir le bloc comme étant occupé 
@@ -357,9 +399,9 @@ int Dir_Create(char *path)
 
     inode_bloc inode;  
 	memset(&inode,-1,sizeof(inode));
-	inode.type=0;
-	inode.size=0;
-	inode.pointers[0]=bloc_no;
+	inode.tf=0;
+	inode.sz=0;
+	inode.adr[0]=bloc_no;
 
 	int inode_no = findfree(Imap); //quel num d'inode dispo ?
 
@@ -383,17 +425,16 @@ int Dir_Create(char *path)
 
 	paire ma_paire;
 
-	ma_paire.filename=name;
+	strcpy(name,ma_paire.filename);
 	ma_paire.inode=inode_no;
 
-	//Chercher l'inode su répertoire parent
+	//Chercher l'inode du répertoire parent
 
 	char parent_name=str[len-2];
 	int inode_parent_index=nameToInode(parent_name);
 
-	inode inode_parent=readinode(inode_parent_index);
 
-	int bloc_parent_index=inode_parent.pointers[0];
+	int bloc_parent_index=readinode(inode_parent_index).adr[0];
 
 	//placer ma_paire dans le répertoire parent
 
