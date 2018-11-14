@@ -75,45 +75,45 @@ paire readPaire(int indice_bloc, int indice_paire){ //renvoie une paire à parti
 
 }
 
-int nameToInodeAux(char* path, int inode_depart){
+int nameToInodeAux(char* path, int inode_depart, int indice_path){
 
-	for(int i=inode_depart; i<8192; i++){  //parcours des inodes
+	if(indice_path==strlen(path)){
 
-		int indice_bloc=readinode(i).adr[0];
+		return inode_depart;
 
-		for(int j=0; j<16;j++){
+	}else{
 
-			char filename = readPaire(indice_bloc,j).filename;
-			if (filename==indice_path){
 
-				
+		int indice_bloc=readinode(inode_depart).adr[0];
+
+		
+		if(readinode(inode_depart).tf==1){ //si c'est un dossier
+
+			for(int i=0; i<16; i++){
+
+				if(readPaire(indice_bloc,i).filename==path[indice_path]){
+
+					nameToInodeAux(path,readPaire(indice_bloc,i).inode,indice_path+1);
+
+				}
+
 
 			}
+
 		}
+	
 
 	}
+
+
+	return -1;
+
+
 }
 
 int nameToInode(char* path){ //renvoie le numero d'inode depuis le nom du fichier
 
-	bool trouve=false;
-	int indice_path = 0;
-
-	for(int i=0; i<8192; i++){  //parcours des inodes
-
-		int indice_bloc=readinode(i).adr[0];
-
-		for(int j=0; j<16;j++){
-
-			char filename = readPaire(indice_bloc,j).filename;
-			if (filename==indice_path){
-
-				indice_path ++;
-
-			}
-		}
-
-	}
+	return nameToInodeAux(path,0,0);
 
 }
 
@@ -173,10 +173,11 @@ int formatDisk(){ //formater le disque pour la première utilisation
 
 int checkDisk(){ //Vérifier que le disque appartient bien au FS
 
-	unsigned char magic_number_read;
-	Disk_Read(0,(char*)&magic_number_read);
+	superbloc superbloc_read;
 
-	if(magic_number_read==magicNumber){
+	Disk_Read(0,(char*)&superbloc_read);
+
+	if(superbloc_read.magic_number==magicNumber){
 
 		printf("FS reconnu");
 		return 0;
@@ -396,7 +397,7 @@ int Dir_Create(char *path)
    	}
 
 	data_bloc bloc;
-	memset(&bloc,0,sizeof(data_bloc));
+	memset(&bloc,-1,sizeof(data_bloc));
 	Disk_Write(2053+bloc_no,(char*)&bloc); //écriture du nouveau bloc
 
 
@@ -455,8 +456,6 @@ int Dir_Create(char *path)
 	Disk_Write(2053+bloc_parent_index,new_data);	
 
 
-
-
 	if(savemaps()==-1 || FS_Sync()==-1){ //sauvegarde des bitmaps mises à jour
 
 		osErrno= E_CREATE;
@@ -469,18 +468,102 @@ int Dir_Create(char *path)
 
 int Dir_Size(char *path)
 {
-    printf("Dir_Size\n");
-    return 0;
+
+
+	char *str=strtok(path,"/");
+
+	int indice_inode=nameToInode(str);
+
+	if(indice_inode==-1){
+
+		osErrno=E_CREATE;
+		printf("Erreur: Dir_Size() error\n");
+		return -1;
+	}
+
+	int indice_bloc=readinode(indice_inode).adr[0];
+
+	int cpt=0;
+
+	for(int i=0; i<16; i++){
+
+		if(readPaire(indice_bloc,i).inode!=-1){
+
+			cpt++;
+		}
+	}
+
+
+	return cpt;
+
+
+
 }
 
 int Dir_Read(char *path, void *buffer, int size)
+
 {
-    printf("Dir_Read\n");
-    return 0;
+   
+
+   int inode = nameToInode(path);
+
+   if(inode==-1){
+
+   		osErrno=E_GENERAL;
+   		printf("Erreur: Dir_Read() error\n");
+   		return -1;
+
+   }
+
+   int indice_bloc=readinode(inode).adr[0];
+
+   for(int i=0; i<16 ;i++){
+
+   		paire pairei=readPaire(indice_bloc,i);
+   		strcat(buffer,(char*)pairei.filename);
+   		strcat(buffer,(char*)pairei.inode);
+
+
+   }
+
+   return 0;
+
+
+
 }
 
 int Dir_Unlink(char *path)
 {
     printf("Dir_Unlink\n");
+
+    int indice_inode=nameToInode(path);
+
+    if(Dir_Size(path)!=0){
+
+    	osErrno=E_DIR_NOT_EMPTY;
+    	printf("Erreur: Le dossier n'est pas vide\n");
+    	return -1;
+    }
+
+    if(indice_inode==0){
+
+    	osErrno=E_ROOT_DIR;
+    	printf("Erreur: Impossible de supprimer le répertoire racine\n");
+    	return -1;
+    }
+
+    for(int i=0; i<30; i++){
+
+	    int indice_bloc=readinode(indice_inode).adr[i];
+	   	Dmap[indice_bloc]=0;
+	
+
+	 }
+
+	   	Imap[indice_inode]=0;
+	   	savemaps();
+
     return 0;
+}
+
 }
