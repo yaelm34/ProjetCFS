@@ -59,53 +59,61 @@ typedef struct paire{ //32 octets
 
 static inode_bloc open_file_table[256]; //table des fichiers ouverts
 
-int nameToInode(char* path){ //renvoie le numero d'inode depuis le nom du fichier
+paire readPaire(int indice_bloc, int indice_paire){ //renvoie une paire à partir de l'indice 
 
-	int inode_no;
-	int l= strlen(path);
+	paire tab_paires[16];
 
-	for(int c=0; c<l-1 ;c++){
+	if(Disk_Read(2053+indice_bloc,(char*)tab_paires)==-1){
 
-		for(int i=0; i<8192; i++){
+		osErrno=E_GENERAL;
+		printf("Erreur: impossible de lire la table d'association");
+		exit(-1);
 
-			inode_no=i; 
-			indice_bloc=readinode(inode_no).adr[0];
-			int type=readinode(inode_no).tf;
-
-			if(type==1){ //si c'est un dossier
-
-				paire sect_paire[16];
-				Disk_Read(2053+indice_bloc,(char*)sect_paire);
-
-				for(int j=0; j<16; j++){
-
-					if(sect_paire[j].filename=path[c]){
-
-						if (c==l-1){
-
-							
-						}
-
-
-					}else{
-
-						return -1;
-					}
-				}
-			}
-
-
-
-
-
-
-
-
-
-		}
 	}
 
-	return 0;
+	return tab_paires[indice_paire];
+
+}
+
+int nameToInodeAux(char* path, int inode_depart){
+
+	for(int i=inode_depart; i<8192; i++){  //parcours des inodes
+
+		int indice_bloc=readinode(i).adr[0];
+
+		for(int j=0; j<16;j++){
+
+			char filename = readPaire(indice_bloc,j).filename;
+			if (filename==indice_path){
+
+				
+
+			}
+		}
+
+	}
+}
+
+int nameToInode(char* path){ //renvoie le numero d'inode depuis le nom du fichier
+
+	bool trouve=false;
+	int indice_path = 0;
+
+	for(int i=0; i<8192; i++){  //parcours des inodes
+
+		int indice_bloc=readinode(i).adr[0];
+
+		for(int j=0; j<16;j++){
+
+			char filename = readPaire(indice_bloc,j).filename;
+			if (filename==indice_path){
+
+				indice_path ++;
+
+			}
+		}
+
+	}
 
 }
 
