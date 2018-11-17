@@ -1,0 +1,7 @@
+
+Vous devez mettre a jour la variable  LD_LIBRARY_PATH pour indiquer le chemin vers la librarie partagee libFS.so
+
+Exemple:
+
+export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:.
+
