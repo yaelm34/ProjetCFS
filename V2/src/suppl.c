@@ -7,8 +7,12 @@
  
 // les bitmaps
 
-static char Imap[1024];
-static char Dmap[1024];
+
+typedef unsigned char byte;
+
+
+static byte Imap[1024];
+static byte Dmap[1024];
 
 
 int readbit(char c, int pos) { // return 1, s'il y a un 1 sur la position pos dans c

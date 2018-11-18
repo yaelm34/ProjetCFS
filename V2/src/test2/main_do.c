@@ -27,9 +27,9 @@ int main(int argc, char *argv[])
     //En cas de creation d'une nouvelle image Sync doit
     //ecrire sur le disque
     FS_Sync();
-    File_Create("/test.txt")  ;
+ File_Create("/test.txt")  ;
     int des = File_Open("/test.txt")  ;
-    File_Write(des, "GOODLUCK",9);
+   File_Write(des, "GOODLUCK",9);
     File_Close(des);
     FS_Sync();
     return 0;

@@ -28,8 +28,8 @@ int main(int argc, char *argv[])
     //En cas de creation d'une nouvelle image Sync doit
     //ecrire sur le disque
     FS_Sync();
-    Dir_Create("/dirtest");
-    File_Create("/dirtest/test.txt")  ;
+    Dir_Create("/dirtest3");
+   // File_Create("/dirtest/test.txt")  ;
     FS_Sync();
 printf("TAILLE : %d", Dir_Size("/"));
     return 0;
